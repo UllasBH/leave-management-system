@@ -204,7 +204,14 @@ leave-management-system/
 │   └── full_schema.sql
 │
 ├── types/
-│  
+│   └── database.types.ts
+│
+├── middleware.ts
+├── next.config.ts
+├── package.json
+├── package-lock.json
+├── README.md
+└── BRD.md
 
 ### Important Directories
 
