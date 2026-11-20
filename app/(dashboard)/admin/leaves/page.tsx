@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CheckSquare, Search, RefreshCw, Eye, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { CheckSquare, Search, RefreshCw } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Profile, LeaveRequest } from "@/types/database.types";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 
 export default function AdminLeavesPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -38,8 +38,11 @@ export default function AdminLeavesPage() {
 
       const { data: reqData } = await supabase
         .from("leave_requests")
-        .select("*, profile:profiles(*), leave_type:leave_types(*)")
-        .order("created_at", { ascending: false });
+.select(`
+  *,
+  profile:profiles!leave_requests_user_id_fkey(*),
+  leave_type:leave_types(*)
+`)        .order("created_at", { ascending: false });
 
       if (reqData) setRequests(reqData);
     } finally {
@@ -211,15 +214,12 @@ export default function AdminLeavesPage() {
         </Card>
       </div>
 
-      {profile && (
-        <LeaveApprovalModal
-          request={selectedRequest}
-          adminId={profile.id}
-          open={isModalOpen}
-          onOpenChange={setIsModalOpen}
-          onSuccess={loadRequests}
-        />
-      )}
+      <LeaveApprovalModal
+        request={selectedRequest}
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        onSuccess={loadRequests}
+      />
     </DashboardShell>
   );
 }

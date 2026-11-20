@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function updateSession(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
   let response = NextResponse.next({
     request: {
       headers: request.headers,
@@ -11,8 +12,25 @@ export async function updateSession(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // If Supabase keys are not configured yet, allow viewing pages in demo/dev mode
-  if (!supabaseUrl || !supabaseAnonKey || supabaseUrl.includes("placeholder")) {
+  // Fail closed on protected routes when authentication cannot be configured.
+  if (
+    !supabaseUrl ||
+    !supabaseAnonKey ||
+    supabaseUrl.includes("placeholder") ||
+    supabaseAnonKey.includes("placeholder")
+  ) {
+    if (pathname.startsWith("/admin") || pathname.startsWith("/employee")) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("error", "authentication_unavailable");
+      return NextResponse.redirect(url);
+    }
+    if (pathname === "/") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("error", "authentication_unavailable");
+      return NextResponse.redirect(url);
+    }
     return response;
   }
 
@@ -44,28 +62,45 @@ export async function updateSession(request: NextRequest) {
 
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
+  if (authError && authError.name !== "AuthSessionMissingError") {
+    if (pathname.startsWith("/admin") || pathname.startsWith("/employee")) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("error", "authentication_unavailable");
+      return NextResponse.redirect(url);
+    }
+    if (pathname === "/") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("error", "authentication_unavailable");
+      return NextResponse.redirect(url);
+    }
+    return response;
+  }
 
-  const pathname = request.nextUrl.pathname;
-
-  // If user is authenticated, retrieve profile role
+  // Resolve a role only from a successfully loaded profile.
   let userRole: "employee" | "admin" | null = null;
   if (user) {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single();
 
-    userRole = profile?.role || "employee";
+    if (!profileError && (profile?.role === "employee" || profile?.role === "admin")) {
+      userRole = profile.role;
+    }
   }
 
   // Route: /admin/*
   if (pathname.startsWith("/admin")) {
-    if (!user) {
+    if (!user || userRole === null) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
-      url.searchParams.set("redirectTo", pathname);
+      url.searchParams.set("error", user ? "profile_unavailable" : "authentication_required");
+      if (!user) url.searchParams.set("redirectTo", pathname);
       return NextResponse.redirect(url);
     }
     if (userRole !== "admin") {
@@ -77,17 +112,18 @@ export async function updateSession(request: NextRequest) {
 
   // Route: /employee/*
   if (pathname.startsWith("/employee")) {
-    if (!user) {
+    if (!user || userRole === null) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
-      url.searchParams.set("redirectTo", pathname);
+      url.searchParams.set("error", user ? "profile_unavailable" : "authentication_required");
+      if (!user) url.searchParams.set("redirectTo", pathname);
       return NextResponse.redirect(url);
     }
   }
 
   // Route: /login or /register
   if (pathname === "/login" || pathname === "/register") {
-    if (user) {
+    if (user && userRole !== null) {
       const target = userRole === "admin" ? "/admin/dashboard" : "/employee/dashboard";
       return NextResponse.redirect(new URL(target, request.url));
     }
@@ -95,12 +131,11 @@ export async function updateSession(request: NextRequest) {
 
   // Root route /
   if (pathname === "/") {
-    if (user) {
+    if (user && userRole !== null) {
       const target = userRole === "admin" ? "/admin/dashboard" : "/employee/dashboard";
       return NextResponse.redirect(new URL(target, request.url));
-    } else {
-      return NextResponse.redirect(new URL("/login", request.url));
     }
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   return response;

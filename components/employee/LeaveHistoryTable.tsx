@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search, Eye, XCircle, AlertCircle, FileText, Calendar, Clock, CheckCircle } from "lucide-react";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Search, Eye, XCircle, Calendar } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/toast";
 
@@ -49,10 +49,9 @@ export function LeaveHistoryTable({
     setIsCancelling(true);
     try {
       const supabase = createBrowserClient();
-      const { error } = await supabase
-        .from("leave_requests")
-        .update({ status: "cancelled" })
-        .eq("id", requestId);
+      const { error } = await supabase.rpc("cancel_leave_request", {
+        p_request_id: requestId,
+      });
 
       if (error) throw error;
 

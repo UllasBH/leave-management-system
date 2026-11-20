@@ -2,7 +2,6 @@
 
 import React from "react";
 import { User, ShieldCheck } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 
 interface NavbarProps {
   userName?: string;

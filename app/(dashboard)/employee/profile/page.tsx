@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { User, Mail, Building, Briefcase, ShieldCheck, Save, Calendar, CheckCircle2 } from "lucide-react";
+import { User, Mail, Building, Briefcase, Save, Calendar } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Profile, LeaveBalance } from "@/types/database.types";
 import { formatDate } from "@/lib/utils";
@@ -22,7 +22,7 @@ export default function EmployeeProfilePage() {
   const [designation, setDesignation] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [currentYear, setCurrentYear] = useState<number>(2026);
+  const currentYear = new Date().getFullYear();
 
   useEffect(() => {
     async function loadProfile() {
@@ -104,6 +104,7 @@ export default function EmployeeProfilePage() {
           <p className="text-sm text-slate-500">
             View and manage your organizational details and current leave balance allocations.
           </p>
+          {isLoading && <p role="status" className="text-sm text-slate-500">Loading profile...</p>}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

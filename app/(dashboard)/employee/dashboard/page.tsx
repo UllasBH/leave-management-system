@@ -6,89 +6,68 @@ import { DashboardShell } from "@/components/common/DashboardShell";
 import { BalanceCards } from "@/components/employee/BalanceCards";
 import { LeaveHistoryTable } from "@/components/employee/LeaveHistoryTable";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarPlus, ArrowRight, ShieldAlert, Sparkles } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { CalendarPlus, ArrowRight, Sparkles } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { Profile, LeaveBalance, LeaveRequest, LeaveType } from "@/types/database.types";
+import { Profile, LeaveBalance, LeaveRequest } from "@/types/database.types";
 
 export default function EmployeeDashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
-  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentYear, setCurrentYear] = useState<number>(2026);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const currentYear = new Date().getFullYear();
 
-  const loadData = useCallback(async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
-      setIsLoading(true);
       const supabase = createBrowserClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
 
-      if (!user) return;
+      if (!user) {
+        throw new Error("Your session has expired. Please sign in again.");
+      }
 
-      // 1. Fetch Profile
-      const { data: profData } = await supabase
+      setIsLoading(true);
+      setLoadError(null);
+      const { data: profData, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user.id)
         .single();
+      if (profileError) throw profileError;
+      setProfile(profData);
 
-      if (profData) setProfile(profData);
-
-      // 2. Fetch Leave Types
-      const { data: typesData } = await supabase
-        .from("leave_types")
-        .select("*")
-        .eq("is_active", true);
-
-      if (typesData) setLeaveTypes(typesData);
-
-      // 3. Fetch Balances for Current Year
-      const curYear = new Date().getFullYear();
-      const { data: balData } = await supabase
+      const { data: balData, error: balanceError } = await supabase
         .from("leave_balances")
         .select("*, leave_type:leave_types(*)")
         .eq("user_id", user.id)
-        .eq("year", curYear);
+        .eq("year", currentYear);
+      if (balanceError) throw balanceError;
+      setBalances(balData);
 
-      if (balData && balData.length > 0) {
-        setBalances(balData);
-      } else if (typesData) {
-        // Fallback default balances if not yet populated
-        const mockBalances: LeaveBalance[] = typesData.map((lt) => ({
-          id: lt.id,
-          user_id: user.id,
-          leave_type_id: lt.id,
-          year: curYear,
-          allocated_days: lt.default_days_per_year,
-          used_days: 0,
-          pending_days: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          leave_type: lt,
-        }));
-        setBalances(mockBalances);
-      }
-
-      // 4. Fetch User's Leave Requests
-      const { data: reqData } = await supabase
+      const { data: reqData, error: requestError } = await supabase
         .from("leave_requests")
         .select("*, leave_type:leave_types(*)")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
-
-      if (reqData) setRequests(reqData);
+      if (requestError) throw requestError;
+      setRequests(reqData);
     } catch (err) {
-      console.error("Error loading dashboard data:", err);
+      const message = err instanceof Error ? err.message : "Could not load your dashboard data.";
+      setLoadError(message);
+      setProfile(null);
+      setBalances([]);
+      setRequests([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [currentYear]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    void Promise.resolve().then(fetchDashboardData);
+  }, [fetchDashboardData]);
 
   const pendingCount = requests.filter((r) => r.status === "pending").length;
   const approvedCount = requests.filter((r) => r.status === "approved").length;
@@ -138,7 +117,17 @@ export default function EmployeeDashboardPage() {
               Refreshed automatically on submission
             </span>
           </div>
+          {loadError && (
+            <p role="alert" className="text-sm text-red-600">
+              {loadError}
+            </p>
+          )}
           <BalanceCards balances={balances} isLoading={isLoading} />
+          {!isLoading && !loadError && balances.length === 0 && (
+            <p className="text-sm text-slate-500">
+              No leave balances were found for this year. Please contact your administrator.
+            </p>
+          )}
         </div>
 
         {/* Recent Leave Requests Section */}
@@ -164,7 +153,7 @@ export default function EmployeeDashboardPage() {
             <CardContent className="p-4 md:p-6">
               <LeaveHistoryTable
                 requests={requests.slice(0, 5)}
-                onRefresh={loadData}
+                onRefresh={fetchDashboardData}
                 isLoading={isLoading}
               />
             </CardContent>

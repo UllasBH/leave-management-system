@@ -3,7 +3,7 @@
 import React, { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Building2, Lock, Mail, ArrowRight, ShieldCheck, UserCheck } from "lucide-react";
+import { Building2, Lock, Mail, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,20 +22,23 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [serverError, setServerError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const fillDemoCredentials = (role: "admin" | "employee") => {
-    if (role === "admin") {
-      setEmail("admin@exelon.com");
-      setPassword("Admin@123456");
-    } else {
-      setEmail("john.doe@exelon.com");
-      setPassword("Employee@123456");
+  const [serverError, setServerError] = useState<string | null>(() => {
+    switch (searchParams.get("error")) {
+      case "authentication_unavailable":
+        return "Authentication is temporarily unavailable. Verify Supabase configuration and try again.";
+      case "authentication_required":
+        return "Please sign in to continue.";
+      case "profile_unavailable":
+        return "Your user profile could not be loaded. Please contact an administrator.";
+      case "auth_callback_failed":
+        return "Sign-in could not be completed. Please try again.";
+      default:
+        return null;
     }
-    setErrors({});
-    setServerError(null);
-  };
+  });
+
+  const [selectedRole, setSelectedRole] = useState<"employee" | "admin">("employee");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,28 +70,37 @@ function LoginForm() {
       if (error) {
         setServerError(error.message);
         toastError(error.message);
-        setIsLoading(false);
         return;
       }
 
       if (data.user) {
-        // Fetch user's role from public.profiles
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("role, full_name")
           .eq("id", data.user.id)
           .single();
 
-        const role = profile?.role || "employee";
-        success(`Welcome back, ${profile?.full_name || "User"}!`);
-
-        if (redirectTo) {
-          router.push(redirectTo);
-        } else if (role === "admin") {
-          router.push("/admin/dashboard");
-        } else {
-          router.push("/employee/dashboard");
+        if (
+          profileError ||
+          !profile ||
+          (profile.role !== "admin" && profile.role !== "employee")
+        ) {
+          const message = profileError?.message || "Your user profile could not be found.";
+          const { error: signOutError } = await supabase.auth.signOut();
+          if (signOutError) {
+            console.error("Could not clear session after profile lookup failure:", signOutError);
+          }
+          throw new Error(message);
         }
+
+        const role = profile.role;
+        const defaultRoute = role === "admin" ? "/admin/dashboard" : "/employee/dashboard";
+        const canUseRedirect =
+          redirectTo?.startsWith("/admin/") && role === "admin" ||
+          redirectTo?.startsWith("/employee/") && role === "employee";
+
+        success(`Welcome back, ${profile.full_name || "User"}!`);
+        router.replace(canUseRedirect && redirectTo ? redirectTo : defaultRoute);
         router.refresh();
       }
     } catch (err: unknown) {
@@ -126,36 +138,33 @@ function LoginForm() {
                 {serverError}
               </Alert>
             )}
+            <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
+                <button
+    type="button"
+    onClick={() => setSelectedRole("employee")}
+    className={`rounded-md py-2 text-sm font-semibold transition ${
+      selectedRole === "employee"
+        ? "bg-white text-blue-600 shadow"
+        : "text-slate-500 hover:text-slate-900"
+    }`}
+  >
+    Employee
+  </button>
+  <button
+    type="button"
+    onClick={() => setSelectedRole("admin")}
+    className={`rounded-md py-2 text-sm font-semibold transition ${
+      selectedRole === "admin"
+        ? "bg-white text-blue-600 shadow"
+        : "text-slate-500 hover:text-slate-900"
+    }`}
+  >
+    Admin
+  </button>
 
-            {/* Demo Quick-Fill Buttons for Interview Demo */}
-            <div className="rounded-lg bg-blue-50/70 p-3 border border-blue-100 space-y-2">
-              <span className="text-xs font-semibold text-blue-900 flex items-center gap-1.5">
-                <ShieldCheck className="h-4 w-4 text-blue-600" />
-                Quick Demo Presets for Evaluation:
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fillDemoCredentials("employee")}
-                  className="bg-white text-xs text-slate-700 hover:bg-slate-50 border-slate-200"
-                >
-                  <UserCheck className="mr-1 h-3.5 w-3.5 text-blue-600" />
-                  Demo Employee
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fillDemoCredentials("admin")}
-                  className="bg-white text-xs text-slate-700 hover:bg-slate-50 border-slate-200"
-                >
-                  <ShieldCheck className="mr-1 h-3.5 w-3.5 text-amber-600" />
-                  Demo Admin
-                </Button>
-              </div>
-            </div>
+
+  
+</div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
@@ -196,6 +205,7 @@ function LoginForm() {
                 type="submit"
                 className="w-full bg-blue-600 hover:bg-blue-700 font-semibold"
                 isLoading={isLoading}
+                disabled={isLoading}
               >
                 Sign In
                 <ArrowRight className="ml-2 h-4 w-4" />

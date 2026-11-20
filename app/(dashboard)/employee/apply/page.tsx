@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { DashboardShell } from "@/components/common/DashboardShell";
 import { LeaveApplyForm } from "@/components/employee/LeaveApplyForm";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Info, CheckCircle2, ShieldAlert, Sparkles, BookOpen } from "lucide-react";
+import { Info, CheckCircle2, BookOpen } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Profile, LeaveBalance, LeaveRequest, LeaveType } from "@/types/database.types";
 
@@ -81,7 +81,6 @@ export default function EmployeeApplyPage() {
           <div className="lg:col-span-2">
             {!isLoading && profile && (
               <LeaveApplyForm
-                userId={profile.id}
                 leaveTypes={leaveTypes}
                 balances={balances}
                 existingRequests={existingRequests}

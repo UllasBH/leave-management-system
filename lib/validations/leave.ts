@@ -20,6 +20,19 @@ export const leaveApplicationSchema = z
       message: "End date must be on or after start date",
       path: ["endDate"],
     }
+  )
+  .refine(
+    (data) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const start = new Date(data.startDate);
+      start.setHours(0, 0, 0, 0);
+      return start >= today;
+    },
+    {
+      message: "Leave start date cannot be in the past",
+      path: ["startDate"],
+    }
   );
 
 export type LeaveApplicationInput = z.infer<typeof leaveApplicationSchema>;

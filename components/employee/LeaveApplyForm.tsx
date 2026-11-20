@@ -20,7 +20,6 @@ interface LeaveApplyFormProps {
   leaveTypes: LeaveType[];
   balances: LeaveBalance[];
   existingRequests?: LeaveRequest[];
-  userId: string;
   onSuccess?: () => void;
 }
 
@@ -28,7 +27,6 @@ export function LeaveApplyForm({
   leaveTypes,
   balances,
   existingRequests = [],
-  userId,
   onSuccess,
 }: LeaveApplyFormProps) {
   const router = useRouter();
@@ -128,33 +126,16 @@ export function LeaveApplyForm({
     try {
       const supabase = createBrowserClient();
 
-      // Invoke the atomic PL/pgSQL stored procedure
-      const { data, error } = await supabase.rpc("apply_for_leave", {
-        p_user_id: userId,
+      // Invoke the hardened atomic PL/pgSQL stored procedure
+      const { error } = await supabase.rpc("apply_for_leave", {
         p_leave_type_id: leaveTypeId,
         p_start_date: startDate,
         p_end_date: endDate,
-        p_total_days: calculatedDays,
         p_reason: reason,
       });
 
       if (error) {
-        // Fallback to direct insert if RPC not executed in local test DB
-        if (error.message.includes("function") && error.message.includes("does not exist")) {
-          const { error: directErr } = await supabase.from("leave_requests").insert({
-            user_id: userId,
-            leave_type_id: leaveTypeId,
-            start_date: startDate,
-            end_date: endDate,
-            total_days: calculatedDays,
-            reason: reason,
-            status: "pending",
-          });
-
-          if (directErr) throw directErr;
-        } else {
-          throw error;
-        }
+        throw error;
       }
 
       success("Leave application submitted successfully for review!");

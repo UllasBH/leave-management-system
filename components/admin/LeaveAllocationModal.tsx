@@ -2,13 +2,13 @@
 
 import React, { useState } from "react";
 import { Profile, LeaveType } from "@/types/database.types";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
-import { Sliders, CheckCircle2 } from "lucide-react";
+import { Sliders } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { leaveAllocationSchema } from "@/lib/validations/leave";
 import { useToast } from "@/components/ui/toast";

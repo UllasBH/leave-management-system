@@ -7,7 +7,6 @@ import { LeaveAnalyticsChart } from "@/components/admin/LeaveAnalyticsChart";
 import { LeaveApprovalModal } from "@/components/admin/LeaveApprovalModal";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Users,
@@ -16,13 +15,11 @@ import {
   XCircle,
   ArrowRight,
   ShieldCheck,
-  Calendar,
   CheckSquare,
-  Sparkles,
   RefreshCw,
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { Profile, LeaveRequest, LeaveBalance, LeaveType } from "@/types/database.types";
+import { Profile, LeaveRequest } from "@/types/database.types";
 import { formatDate } from "@/lib/utils";
 
 export default function AdminDashboardPage() {
@@ -33,44 +30,88 @@ export default function AdminDashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadAdminData = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const supabase = createBrowserClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+ 
+const fetchDashboardData = useCallback(async () => {
+  const supabase = createBrowserClient();
 
-      // 1. Fetch Admin Profile
-      const { data: profData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-      if (profData) setProfile(profData);
+  try {
+    setIsLoading(true);
 
-      // 2. Fetch All Requests with Profile and Leave Type joins
-      const { data: reqData } = await supabase
-        .from("leave_requests")
-        .select("*, profile:profiles(*), leave_type:leave_types(*)")
-        .order("created_at", { ascending: false });
-      if (reqData) setRequests(reqData);
+    // 1. Get authenticated user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-      // 3. Fetch All Employees
-      const { data: empData } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("full_name", { ascending: true });
-      if (empData) setEmployees(empData);
-    } catch (err) {
-      console.error("Error loading admin dashboard:", err);
-    } finally {
-      setIsLoading(false);
+    if (authError) throw authError;
+
+    if (!user) {
+      console.error("No authenticated admin user found.");
+      return;
     }
-  }, []);
+
+    // 2. Fetch admin profile
+    const { data: profData, error: profileError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) throw profileError;
+
+    if (profData.role !== "admin") {
+      throw new Error("Unauthorized: Admin access required.");
+    }
+
+    setProfile(profData);
+
+    // 3. Fetch leave requests with explicit employee relationship
+    const { data: reqData, error: reqError } = await supabase
+      .from("leave_requests")
+      .select(`
+        *,
+        profile:profiles!leave_requests_user_id_fkey(*),
+        leave_type:leave_types(*)
+      `)
+      .order("created_at", { ascending: false });
+
+    if (reqError) throw reqError;
+
+    setRequests((reqData ?? []) as LeaveRequest[]);
+
+    // 4. Fetch employee profiles
+    const { data: empData, error: empError } = await supabase
+      .from("profiles")
+      .select("*")
+      .order("full_name", { ascending: true });
+
+    if (empError) throw empError;
+
+    setEmployees(empData ?? []);
+
+    console.log("Admin dashboard data loaded:", {
+      totalRequests: reqData?.length ?? 0,
+      pendingRequests:
+        reqData?.filter((r) => r.status === "pending").length ?? 0,
+      employees: empData?.length ?? 0,
+    });
+
+  } catch (err) {
+    console.error("Error loading admin dashboard:", err);
+  } finally {
+    setIsLoading(false);
+  }
+}, []);
+
+
+  const handleManualRefresh = async () => {
+    setIsLoading(true);
+    await fetchDashboardData();
+  };
 
   useEffect(() => {
-    loadAdminData();
-  }, [loadAdminData]);
+    void Promise.resolve().then(fetchDashboardData);
+  }, [fetchDashboardData]);
 
   const pendingRequests = requests.filter((r) => r.status === "pending");
   const approvedRequests = requests.filter((r) => r.status === "approved");
@@ -105,7 +146,7 @@ export default function AdminDashboardPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={loadAdminData}
+                onClick={handleManualRefresh}
                 disabled={isLoading}
                 className="bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700"
               >
@@ -281,15 +322,12 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Review Modal */}
-      {profile && (
-        <LeaveApprovalModal
-          request={selectedRequest}
-          adminId={profile.id}
-          open={isModalOpen}
-          onOpenChange={setIsModalOpen}
-          onSuccess={loadAdminData}
-        />
-      )}
+      <LeaveApprovalModal
+        request={selectedRequest}
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        onSuccess={fetchDashboardData}
+      />
     </DashboardShell>
   );
 }

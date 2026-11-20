@@ -10,7 +10,6 @@ import {
   User,
   Users,
   CheckSquare,
-  BarChart3,
   Sliders,
   LogOut,
   Building2,

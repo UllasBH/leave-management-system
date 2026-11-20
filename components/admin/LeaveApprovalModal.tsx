@@ -2,19 +2,18 @@
 
 import React, { useState } from "react";
 import { LeaveRequest } from "@/types/database.types";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Alert } from "@/components/ui/alert";
 import { formatDate } from "@/lib/utils";
-import { Check, X, AlertCircle, User, Calendar, Clock, FileText } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useToast } from "@/components/ui/toast";
 
 interface LeaveApprovalModalProps {
   request: LeaveRequest | null;
-  adminId: string;
+  adminId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
@@ -22,7 +21,6 @@ interface LeaveApprovalModalProps {
 
 export function LeaveApprovalModal({
   request,
-  adminId,
   open,
   onOpenChange,
   onSuccess,
@@ -50,31 +48,15 @@ export function LeaveApprovalModal({
     try {
       const supabase = createBrowserClient();
 
-      // Call PL/pgSQL atomic procedure
-      const { data, error } = await supabase.rpc("process_leave_action", {
+      // Call hardened PL/pgSQL atomic procedure
+      const { error } = await supabase.rpc("process_leave_action", {
         p_request_id: request.id,
-        p_admin_id: adminId,
         p_action: action,
         p_comment: comment.trim() || null,
       });
 
       if (error) {
-        // Fallback for local test environments
-        if (error.message.includes("function") && error.message.includes("does not exist")) {
-          const { error: directErr } = await supabase
-            .from("leave_requests")
-            .update({
-              status: action,
-              admin_comment: comment.trim() || null,
-              actioned_by: adminId,
-              actioned_at: new Date().toISOString(),
-            })
-            .eq("id", request.id);
-
-          if (directErr) throw directErr;
-        } else {
-          throw error;
-        }
+        throw error;
       }
 
       success(`Leave request successfully ${action}!`);
@@ -127,7 +109,7 @@ export function LeaveApprovalModal({
         {/* Reason */}
         <div>
           <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider block mb-1">
-            Employee's Stated Reason:
+            Employee&apos;s Stated Reason:
           </span>
           <p className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 text-sm">
             {request.reason}

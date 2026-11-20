@@ -19,7 +19,7 @@ export default function AdminAllocationsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [displayYear, setDisplayYear] = useState<number>(2026);
+  const displayYear = new Date().getFullYear();
 
   const loadData = useCallback(async () => {
     try {

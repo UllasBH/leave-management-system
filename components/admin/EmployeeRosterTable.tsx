@@ -6,8 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Search, User, Eye, ShieldCheck, Calendar, Briefcase, Building } from "lucide-react";
+import { Dialog, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Search, User, Eye } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
 interface EmployeeRosterTableProps {
@@ -25,7 +25,7 @@ export function EmployeeRosterTable({
 }: EmployeeRosterTableProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedEmp, setSelectedEmp] = useState<Profile | null>(null);
-  const [currentYear, setCurrentYear] = useState<number>(2026);
+  const currentYear = new Date().getFullYear();
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp) => {
