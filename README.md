@@ -127,9 +127,9 @@ Responsibilities:
 
 ## 7. Project Structure
 
-The project is organized as follows:
+The project is organized into the following directories and files:
 
-\`\`\`text
+```text
 leave-management-system/
 │
 ├── app/
@@ -204,15 +204,7 @@ leave-management-system/
 │   └── full_schema.sql
 │
 ├── types/
-│   └── database.types.ts
-│
-├── middleware.ts
-├── next.config.ts
-├── package.json
-├── package-lock.json
-├── README.md
-└── BRD.md
-\`\`\`
+│  
 
 ### Important Directories
 
